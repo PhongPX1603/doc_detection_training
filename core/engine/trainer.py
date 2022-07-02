@@ -63,7 +63,9 @@ class Trainer:
         for batch in tqdm(dataloader, total=len(dataloader)):
             self.optim.zero_grad()
             params = [param.to(self.device) if torch.is_tensor(param) else param for param in batch]
+            print(len(params[0]))
             params[0] = self.model(params[0])
+            print(len(params[0]))
             loss = self.loss(*params)
             loss.backward()
             self.optim.step()
