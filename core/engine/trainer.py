@@ -62,11 +62,12 @@ class Trainer:
         self.metric.started(evaluator_name)
         for batch in tqdm(dataloader, total=len(dataloader)):
             self.optim.zero_grad()
-            params = [param.to(self.device) if torch.is_tensor(param) else param for param in batch]
-            print(len(params[0]))
+            params = [param if torch.is_tensor(param) or isinstance(param, dict) else param for param in batch]
+            params[0] = torch.stack([image.to(self.device) for image in params[0]], dim=0)
+            params[1] = [{k: v.to(self.device) for k, v in target.items() if not isinstance(v, list)} for target in params[1]]
             params[0] = self.model(params[0])
-            print(len(params[0]))
-            loss = self.loss(*params)
+            cls_loss, reg_loss = self.loss(*params)
+            loss = loss = cls_loss + reg_loss
             loss.backward()
             self.optim.step()
 
@@ -93,7 +94,9 @@ class Trainer:
         self.metric.started(evaluator_name)
         with torch.no_grad():
             for batch in tqdm(dataloader, total=len(dataloader)):
-                params = [param.to(self.device) if torch.is_tensor(param) else param for param in batch]
+                params = [param if torch.is_tensor(param) or isinstance(param, dict) else param for param in batch]
+                params[0] = torch.stack([image.to(self.device) for image in params[0]], dim=0)
+                params[1] = [{k: v.to(self.device) for k, v in target.items() if not isinstance(v, list)} for target in params[1]]
                 params[0] = self.model(params[0])
 
                 iteration_metric = self.metric.iteration_completed(output=params)

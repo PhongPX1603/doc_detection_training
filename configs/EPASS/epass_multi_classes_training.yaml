@@ -1,0 +1,228 @@
+data:
+  train:
+    module: torch.utils.data
+    class: DataLoader
+    DataLoader:
+      dataset:
+        module: core.data.labelme_dataset
+        class: LabelmeDataset
+        LabelmeDataset:
+          dirnames:
+            - '''/extdata/ocr/phungpx/projects/PHUNGPX/object_detection_pytorch/efficient_det_pytorch/dataset/EPASS/train/'''
+          imsize: 768
+          image_patterns: ['''*.jpg''', '''*.png''', '''*.jpeg''', '''*.JPG''', '''*.PNG''', '''*.JPEG''']
+          label_patterns: ['''*.json''']
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
+          classes:
+            EPASS_TYPE_1: 0
+            EPASS_TYPE_2: 1
+            EPASS_TYPE_3: 2
+            EPASS_TYPE_4: 2
+            EPASS_TYPE_5: 3
+          transforms:
+            - iaa.MotionBlur()
+            - iaa.ChangeColorTemperature()
+            - iaa.GaussianBlur(sigma=(0, 1))
+            - iaa.Grayscale(alpha=(0.0, 1.0))
+            - iaa.Add(value=(-50, 50), per_channel=True)
+            - iaa.Fliplr(p=0.5)
+            - iaa.Flipud(p=0.5)
+            - iaa.Crop(percent=(0, 0.1))
+            - iaa.Pad(percent=(0, 0.1), keep_size=False)
+            - iaa.Rot90(k=[0, 1, 2, 3], keep_size=False)
+            # - iaa.Affine(rotate=(0, 360), shear=(-2, 2), fit_output=True)
+      batch_size: 8
+      shuffle: True
+      num_workers: 12
+      pin_memory: True
+      drop_last: False
+      collate_fn: 'lambda batch:tuple(zip(*batch))'
+  
+  train_eval:
+    module: torch.utils.data
+    class: DataLoader
+    DataLoader:
+      dataset:
+        module: core.data.labelme_dataset
+        class: LabelmeDataset
+        LabelmeDataset:
+          dirnames:
+            - '''/extdata/ocr/phungpx/projects/PHUNGPX/object_detection_pytorch/efficient_det_pytorch/dataset/EPASS/train/'''
+          imsize: 768
+          image_patterns: ['''*.jpg''', '''*.png''', '''*.jpeg''', '''*.JPG''', '''*.PNG''', '''*.JPEG''']
+          label_patterns: ['''*.json''']
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
+          classes:
+            EPASS_TYPE_1: 0
+            EPASS_TYPE_2: 1
+            EPASS_TYPE_3: 2
+            EPASS_TYPE_4: 2
+            EPASS_TYPE_5: 3
+      batch_size: 8
+      shuffle: False
+      num_workers: 12
+      pin_memory: True
+      drop_last: False
+      collate_fn: 'lambda batch:tuple(zip(*batch))'
+
+  valid:
+    module: torch.utils.data
+    class: DataLoader
+    DataLoader:
+      dataset:
+        module: core.data.labelme_dataset
+        class: LabelmeDataset
+        LabelmeDataset:
+          dirnames:
+            - '''/extdata/ocr/phungpx/projects/PHUNGPX/object_detection_pytorch/efficient_det_pytorch/dataset/EPASS/valid/'''
+          imsize: 768
+          image_patterns: ['''*.jpg''', '''*.png''', '''*.jpeg''', '''*.JPG''', '''*.PNG''', '''*.JPEG''']
+          label_patterns: ['''*.json''']
+          mean: [0.485, 0.456, 0.406]
+          std: [0.229, 0.224, 0.225]
+          classes:
+            EPASS_TYPE_1: 0
+            EPASS_TYPE_2: 1
+            EPASS_TYPE_3: 2
+            EPASS_TYPE_4: 2
+            EPASS_TYPE_5: 3
+      batch_size: 8
+      shuffle: False
+      num_workers: 12
+      pin_memory: True
+      drop_last: False
+      collate_fn: 'lambda batch:tuple(zip(*batch))'
+
+loss:
+  module: core.loss.focal_loss
+  class: Loss
+  Loss:
+    loss_fn: 
+      module: core.loss.focal_loss
+      class: FocalLoss
+      FocalLoss:
+        alpha: 0.25
+        gamma: 2.0
+        lamda: 50.0
+        device: '''cuda'''
+    output_transform: 'lambda x: (x[0][0], x[0][1], x[0][2], x[1])'
+
+model:
+  module: core.models.retina_net
+  class: Model
+  Model:
+    # pretrained_weight: '''checkpoint/EPASS/resnet50_5_classes/2205140823/best_model_105_focal_loss=-5.1645.pt'''
+    num_classes: 4
+    backbone_name: '''resnet50'''
+    backbone_pretrained: False
+    scales: ['2 ** 0', '2 ** (1 / 3)', '2 ** (2 / 3)']
+    aspect_ratios: [0.25, 0.5, 1., 2., 4.]  # anchor_width / anchor_height
+
+optim:
+  module: torch.optim
+  class: Adam
+  Adam:
+    params: config['model'].parameters()
+    lr: 0.01
+    amsgrad: True
+
+early_stopping:
+  module: core.handlers.early_stopping
+  class: EarlyStopping
+  EarlyStopping:
+    evaluator_name: '''valid'''
+    patience: 50
+    delta: 0
+    mode: '''min'''
+    score_name: '''loss'''
+
+writer:
+  module: core.handlers.writer
+  class: Writer
+  Writer:
+    save_dir: '''checkpoint/EPASS/'''
+
+logger:
+  module: core.handlers.logger
+  class: Logger
+  Logger:
+    save_dir: '''checkpoint/EPASS/'''
+    mode: logging.DEBUG
+    format: '''%(asctime)s - %(name)s - %(levelname)s - %(message)s'''
+
+plot:
+  module: core.handlers.plotter
+  class: Plotter
+  Plotter:
+    save_dir: '''checkpoint/EPASS/'''
+
+lr_scheduler:
+  module: core.handlers.lr_scheduler
+  class: ReduceLROnPlateau
+  ReduceLROnPlateau:
+    evaluator_name: '''valid'''
+    score_name: '''loss'''
+    optim: config['optim']
+    mode: '''min'''
+    factor: 0.1
+    patience: 10
+    verbose: True
+
+model_inspection:
+  module: core.handlers.model_inspection
+  class: ModelInspection
+  ModelInspection:
+    verbose: True
+    input_shape: '(768, 768, 3)'
+
+metric:
+  module: core.handlers.evaluator
+  class: Metrics
+  Metrics:
+    metrics:
+      loss:
+        module: core.metric.loss
+        class: Loss
+        Loss:
+          loss_fn: 
+            module: core.loss.focal_loss
+            class: FocalLoss
+            FocalLoss:
+              alpha: 0.25
+              gamma: 2.
+              lamda: 50.
+              device: '''cuda'''
+          output_transform: 'lambda x: (x[0][0], x[0][1], x[0][2], x[1])'
+      # mAP:
+      #   module: core.metric.
+      #   class: SegmMetric
+      #   SegmMetric:
+      #     metric_name: '''pixel_accuracy'''
+    #     output_transform: 'lambda x: (x[0], x[1], x[2])'
+
+trainer:
+  module: core.engine
+  class: Trainer
+  Trainer:
+    project_name: '''EPASS'''
+    model: config['model']
+    data: config['data']
+    loss: config['loss']
+    optim: config['optim']
+    metric: config['metric']
+    early_stopping: config['early_stopping']
+    lr_scheduler: config['lr_scheduler']
+    logger: config['logger']
+    writer: config['writer']
+    plotter: config['plot']
+    model_inspection: config['model_inspection']
+    save_dir: '''checkpoint/EPASS/'''
+
+extralibs:
+  torch: torch
+  iaa: imgaug.augmenters
+  logging: logging
+  torchvision: torchvision
+  transforms: torchvision.transforms

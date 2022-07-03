@@ -25,7 +25,9 @@ class Evaluator(nn.Module):
         self.metric.started(evaluator_name)
         with torch.no_grad():
             for batch in tqdm(dataloader, total=len(dataloader)):
-                params = [param.to(self.device) if torch.is_tensor(param) else param for param in batch]
+                params = [param if torch.is_tensor(param) or isinstance(param, dict) else param for param in batch]
+                params[0] = torch.stack([image.to(self.device) for image in params[0]], dim=0)
+                params[1] = [{k: v.to(self.device) for k, v in target.items() if not isinstance(v, list)} for target in params[1]]
                 params[0] = self.model(params[0])
 
                 _ = self.metric.iteration_completed(output=params)
