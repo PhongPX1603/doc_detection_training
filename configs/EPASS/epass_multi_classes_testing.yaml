@@ -20,7 +20,7 @@ data:
             EPASS_TYPE_3: 2
             EPASS_TYPE_4: 2
             EPASS_TYPE_5: 3
-      # batch_size: 1
+      batch_size: 8
       shuffle: False
       num_workers: 12
       pin_memory: True
@@ -28,7 +28,7 @@ data:
       collate_fn: 'lambda batch:tuple(zip(*batch))'
 
 model:
-  module: flame.core.model.retina_net
+  module: core.models.retina_net
   class: Model
   Model:
     num_classes: 4
@@ -39,80 +39,46 @@ model:
     iou_threshold: 0.2
     score_threshold: 0.2
 
-metrics:
-  module: flame.handlers.metrics.metrics
+metric:
+  module: core.handlers.evaluator
   class: Metrics
   Metrics:
     metrics:
-      mAP:
-        module: flame.handlers.metrics.evaluator
-        class: Evaluator
-        Evaluator:
-          eval_fn:
-            module: flame.core.metric.mAP
-            class: MeanAveragePrecision
-            MeanAveragePrecision:
-              classes:
-                EPASS_TYPE_1: 0
-                EPASS_TYPE_2: 1
-                EPASS_TYPE_3_4: 2
-                # EPASS_TYPE_4: 3
-                EPASS_TYPE_5: 3
-              iou_threshold: 0.5
-              method: '''every_point_interpolation'''
-              print_FP_files: False
-          output_transform: 'lambda x: (x[0], x[1], x[2])'
-      coco_eval:
-        module: flame.core.metric.COCO_eval
-        class: COCOEvaluator
-        COCOEvaluator:
-          # imsize: 768
-          detection_path: '''checkpoint/EPASS/resnet50_4_classes/2205152129/epass_det_val.json'''
-          ground_truth_path: '''checkpoint/EPASS/resnet50_4_classes/2205152129/epass_gt_val.json'''
-          classes:
-            EPASS_TYPE_1: 0
-            EPASS_TYPE_2: 1
-            EPASS_TYPE_3_4: 2
-            # EPASS_TYPE_4: 3
-            EPASS_TYPE_5: 3
-          output_transform: 'lambda x: (x[0], x[1], x[2])'
-    attach_to:
-      engine: '''test'''
-
-screenlogger:
-  module: flame.handlers.screenlogger
-  class: ScreenLogger
-  ScreenLogger:
-    eval_names:
-      - '''test'''
-
-checkpoint_loader:
-  module: flame.handlers.checkpoint
-  class: CheckpointLoader
-  CheckpointLoader:
-    checkpoint_path: '''checkpoint/EPASS/resnet50_4_classes/2205152129/best_model_103_focal_loss=-4.7155.pt'''
-    mode: '''test'''
+      loss:
+        module: core.metric.loss
+        class: Loss
+        Loss:
+          loss_fn: 
+            module: core.loss.focal_loss
+            class: FocalLoss
+            FocalLoss:
+              alpha: 0.25
+              gamma: 2.
+              lamda: 50.
+              device: '''cuda'''
 
 predictor:
-  module: flame.handlers.region_predictor
+  module: core.handlers.predictor
   class: RegionPredictor
   RegionPredictor:
-    evaluator_name: '''engine'''
-    output_dir: '''checkpoint/EPASS/resnet50_4_classes/2205152129/best_model_103_focal_loss=-4.7155'''
     imsize: 768
     classes:
-      EPASS_TYPE_1: [[128, 0, 0], 0]
-      EPASS_TYPE_2: [[0, 128, 0], 1]
-      EPASS_TYPE_3_4: [[128, 128, 0], 2]
-      EPASS_TYPE_5: [[0, 0, 128], 3]
-    output_transform: 'lambda x: (x[0], x[-1])'
+      EPASS_TYPE_1: [[0, 0, 255], 0]
+      EPASS_TYPE_2: [[0, 255, 0], 1]
+      EPASS_TYPE_3_4: [[255, 0, 0], 2]
+      EPASS_TYPE_5: [[255, 0, 255], 3]
+    score_threshold: 0.5
+    iou_threshold: 0.5
+    output_dir: '''checkpoint/EPASS/PREDICTS'''
 
-engine:
-  module: flame.core.engine.evaluator
+evaluator:
+  module: core.engine
   class: Evaluator
   Evaluator:
-    dataset: config['data']['test']
-    device: '''cuda'''
+    data: config['data']['test']
+    model: config['model']
+    metric: config['metric']
+    predictor: config['predictor']
 
 extralibs:
   torch: torch

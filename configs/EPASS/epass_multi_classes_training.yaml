@@ -107,7 +107,7 @@ loss:
         gamma: 2.0
         lamda: 50.0
         device: '''cuda'''
-    output_transform: 'lambda x: (x[0][0], x[0][1], x[0][2], x[1])'
+    # output_transform: 'lambda x: (x[0][0], x[0][1], x[0][2], x[1])'
 
 model:
   module: core.models.retina_net
@@ -194,13 +194,17 @@ metric:
               gamma: 2.
               lamda: 50.
               device: '''cuda'''
-          output_transform: 'lambda x: (x[0][0], x[0][1], x[0][2], x[1])'
-      # mAP:
-      #   module: core.metric.
-      #   class: SegmMetric
-      #   SegmMetric:
-      #     metric_name: '''pixel_accuracy'''
-    #     output_transform: 'lambda x: (x[0], x[1], x[2])'
+
+predictor:
+  module: core.handlers.predictor
+  class: RegionPredictor
+  RegionPredictor:
+    imsize: 768
+    classes:
+      EPASS: [[0, 0, 255], 0]
+    score_threshold: 0.5
+    iou_threshold: 0.5
+    output_dir: '''checkpoint/EPASS/PREDICTS'''
 
 trainer:
   module: core.engine
@@ -219,6 +223,7 @@ trainer:
     plotter: config['plot']
     model_inspection: config['model_inspection']
     save_dir: '''checkpoint/EPASS/'''
+    predictor: config['predictor']
 
 extralibs:
   torch: torch

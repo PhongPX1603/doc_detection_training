@@ -49,7 +49,6 @@ class Metrics:
         iteration_metric = dict()
         for metric_name, metric_fn in self.evaluator_metric.items():
             iteration_metric[metric_name] = metric_fn.iteration_completed(output=output)
-
         return iteration_metric
 
     def epoch_completed(self) -> Dict[str, Any]:

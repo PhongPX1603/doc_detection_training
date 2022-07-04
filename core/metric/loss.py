@@ -13,8 +13,7 @@ class Loss(MetricBase):
         self._num_examples = 0
 
     def update(self, output):
-        cls_loss, reg_loss = self._loss_fn(*output)
-        average_loss = cls_loss + reg_loss
+        average_loss = self._loss_fn(*output)
 
         N = output[0].shape[0]
         self._sum += average_loss.item() * N

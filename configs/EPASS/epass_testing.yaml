@@ -88,7 +88,7 @@ predictor:
       EPASS: [[0, 0, 255], 0]
     output_transform: 'lambda x: (x[0], x[-1])'
 
-engine:
+evaluator:
   module: flame.core.engine.evaluator
   class: Evaluator
   Evaluator:

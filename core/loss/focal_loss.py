@@ -244,4 +244,4 @@ class FocalLoss(nn.Module):
         targets: List[Dict[str, torch.Tensor]]
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         cls_loss, reg_loss = self.loss_fn(cls_preds, reg_preds, anchors, targets)
-        return cls_loss, self.lamda * reg_loss
+        return cls_loss + self.lamda * reg_loss

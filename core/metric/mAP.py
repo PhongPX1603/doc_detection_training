@@ -166,8 +166,6 @@ class MeanAveragePrecision(nn.Module):
                 ]
             )
 
-        print(average_precision_stats)
-
         mAP = sum(average_precisions) / len(average_precisions) if len(average_precisions) else 0.
 
         if self.print_FP_files:
@@ -180,7 +178,6 @@ class MeanAveragePrecision(nn.Module):
 
         if self.print_detail_mAP:
             return mAP, results
-
         return mAP
 
     def every_points_interpolated_AP(

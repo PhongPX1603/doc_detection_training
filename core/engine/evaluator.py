@@ -14,23 +14,28 @@ class Evaluator(nn.Module):
         data: nn.Module,
         model: nn.Module,
         metric: Callable,
+        predictor: Callable
     ):
         super(Evaluator, self).__init__()
         self.data = data
         self.model = model
         self.metric = metric
+        self.predictor = predictor
 
     def eval_epoch(self, evaluator_name: str, dataloader: nn.Module) -> Dict[str, float]:
         self.model.eval()
         self.metric.started(evaluator_name)
         with torch.no_grad():
             for batch in tqdm(dataloader, total=len(dataloader)):
-                params = [param if torch.is_tensor(param) or isinstance(param, dict) else param for param in batch]
-                params[0] = torch.stack([image.to(self.device) for image in params[0]], dim=0)
-                params[1] = [{k: v.to(self.device) for k, v in target.items() if not isinstance(v, list)} for target in params[1]]
-                params[0] = self.model(params[0])
-
-                _ = self.metric.iteration_completed(output=params)
+                params = [param for param in batch]
+                samples = torch.stack([image.to(self.device) for image in params[0]], dim=0)
+                targets = [{k: v.to(self.device) for k, v in target.items() if not isinstance(v, list)} for target in params[1]]
+                preds, cls_preds, reg_preds, anchors = self.model(samples)
+                
+                if self.predictor is not None:
+                    self.predictor.update([preds, params[2]])
+                
+                _ = self.metric.iteration_completed(output=[preds, cls_preds, reg_preds, anchors, targets, params[2]])
 
         return self.metric.epoch_completed()
 

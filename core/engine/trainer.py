@@ -29,6 +29,7 @@ class Trainer:
         plotter: Callable,
         save_dir: str,
         model_inspection: Callable = None,
+        predictor: Callable = None
     ):
         super(Trainer, self).__init__()
         self.logger = logger.get_logger(log_name=project_name)
@@ -39,6 +40,7 @@ class Trainer:
         self.metric = metric
         self.lr_scheduler = lr_scheduler
         self.early_stopping = early_stopping
+        self.predictor = predictor
 
         # Logger and Tensorboard
         self.writer = writer
@@ -63,11 +65,10 @@ class Trainer:
         for batch in tqdm(dataloader, total=len(dataloader)):
             self.optim.zero_grad()
             params = [param if torch.is_tensor(param) or isinstance(param, dict) else param for param in batch]
-            params[0] = torch.stack([image.to(self.device) for image in params[0]], dim=0)
-            params[1] = [{k: v.to(self.device) for k, v in target.items() if not isinstance(v, list)} for target in params[1]]
-            params[0] = self.model(params[0])
-            cls_loss, reg_loss = self.loss(*params)
-            loss = loss = cls_loss + reg_loss
+            samples = torch.stack([image.to(self.device) for image in params[0]], dim=0)
+            targets = [{k: v.to(self.device) for k, v in target.items() if not isinstance(v, list)} for target in params[1]]
+            preds, cls_preds, reg_preds, anchors = self.model(samples)
+            loss = self.loss(cls_preds, reg_preds, anchors, targets)
             loss.backward()
             self.optim.step()
 
@@ -78,7 +79,7 @@ class Trainer:
                 step=self.iteration_counters[evaluator_name]
             )
 
-            iteration_metric = self.metric.iteration_completed(output=params)
+            iteration_metric = self.metric.iteration_completed(output=[preds, cls_preds, reg_preds, anchors, targets, params[2]])
 
             for metric_name, metric_value in iteration_metric.items():
                 self.writer.add_scalar(
@@ -94,12 +95,15 @@ class Trainer:
         self.metric.started(evaluator_name)
         with torch.no_grad():
             for batch in tqdm(dataloader, total=len(dataloader)):
-                params = [param if torch.is_tensor(param) or isinstance(param, dict) else param for param in batch]
-                params[0] = torch.stack([image.to(self.device) for image in params[0]], dim=0)
-                params[1] = [{k: v.to(self.device) for k, v in target.items() if not isinstance(v, list)} for target in params[1]]
-                params[0] = self.model(params[0])
-
-                iteration_metric = self.metric.iteration_completed(output=params)
+                params = [param for param in batch]
+                samples = torch.stack([image.to(self.device) for image in params[0]], dim=0)
+                targets = [{k: v.to(self.device) for k, v in target.items() if not isinstance(v, list)} for target in params[1]]
+                
+                preds, cls_preds, reg_preds, anchors = self.model(samples)
+                if self.predictor is not None:
+                    self.predictor.update([preds, params[2]])
+                
+                iteration_metric = self.metric.iteration_completed(output=[preds, cls_preds, reg_preds, anchors, targets, params[2]])
 
                 for metric_name, metric_value in iteration_metric.items():
                     self.writer.add_scalar(
